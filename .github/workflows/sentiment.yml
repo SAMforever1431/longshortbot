@@ -1,26 +1,29 @@
-name: Run XAUUSD Sentiment Scraper
+name: Test Myfxbook API
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
-  run-bot:
+  test-myfxbook:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run script
-        run: python full_sentiment_bot.py
+      - name: Test Myfxbook
+        env:
+          MYFXBOOK_EMAIL: ${{ secrets.MYFXBOOK_EMAIL }}
+          MYFXBOOK_PASSWORD: ${{ secrets.MYFXBOOK_PASSWORD }}
+        run: |
+          python full_sentiment_bot.py
