@@ -3,7 +3,7 @@ name: XAUUSD Sentiment Aggregator
 on:
 
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/15 * * * *"
 
   workflow_dispatch:
 
