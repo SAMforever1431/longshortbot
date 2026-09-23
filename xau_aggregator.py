@@ -8,12 +8,8 @@ import random
 import pandas as pd
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# Import curl_cffi to bypass strict Cloudflare protection
-try:
-    from curl_cffi import requests as cffi_requests
-    HAS_CFFI = True
-except ImportError:
-    HAS_CFFI = False
+# Nayi library import kar rahe hain Cloudflare bypass ke liye
+import cloudscraper
 
 # --- Render Health Check Dummy Server ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
@@ -37,12 +33,20 @@ CONFIG = {
 }
 
 # Auto-refresh interval limits (Randomized between 2 to 7 minutes)
-MIN_INTERVAL = 120  # 2 minutes in seconds
-MAX_INTERVAL = 420  # 7 minutes in seconds
+MIN_INTERVAL = 120  
+MAX_INTERVAL = 420  
 
 class XAUUSDPositionAggregator:
     def __init__(self, config):
         self.config = config
+        # Ek naya cloudscraper instance banaya jo Chrome browser hone ka natak karega
+        self.scraper = cloudscraper.create_scraper(
+            browser={
+                'browser': 'chrome',
+                'platform': 'windows',
+                'desktop': True
+            }
+        )
 
     def fetch_oanda(self):
         token = self.config.get("oanda_token")
@@ -117,12 +121,8 @@ class XAUUSDPositionAggregator:
         url = "https://www.myfxbook.com/community/outlook/XAUUSD"
         
         try:
-            if HAS_CFFI:
-                # Using pure Chrome impersonation without custom headers to avoid mismatch
-                res = cffi_requests.get(url, impersonate="chrome120", timeout=30)
-            else:
-                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'}
-                res = requests.get(url, headers=headers, timeout=30)
+            # Yahan nayi cloudscraper library ka use kar rahe hain
+            res = self.scraper.get(url, timeout=30)
 
             if res.status_code != 200:
                 return {"Source": "Myfxbook (Retail)", "Metric": "NaN", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Timestamp": "NaN", "Status": f"HTTP {res.status_code}"}
@@ -204,7 +204,7 @@ if __name__ == "__main__":
     threading.Thread(target=start_dummy_server, daemon=True).start()
     
     aggregator = XAUUSDPositionAggregator(config=CONFIG)
-    print("Starting XAU/USD Sentiment Telegram Dispatcher with Randomized Delays...")
+    print("Starting XAU/USD Sentiment Telegram Dispatcher with Randomized Delays & Cloudscraper...")
     
     while True:
         try:
@@ -221,7 +221,6 @@ if __name__ == "__main__":
             bot_token = CONFIG.get("telegram_bot_token")
             chat_id = CONFIG.get("telegram_chat_id")
             
-            # --- Random Timing Logic ---
             wait_time = random.randint(MIN_INTERVAL, MAX_INTERVAL)
             wait_minutes = wait_time // 60
             wait_seconds = wait_time % 60
