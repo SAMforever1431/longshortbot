@@ -4,6 +4,7 @@ import datetime
 import threading
 import requests
 import re
+import random
 import pandas as pd
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -35,9 +36,9 @@ CONFIG = {
     "telegram_chat_id": "1341536286"
 }
 
-# Auto-refresh interval (300 seconds = 5 minutes)
-# Myfxbook rate-limit block se bachne ke liye 1 minute se badha kar 5 minute kiya gaya hai
-FETCH_INTERVAL = 300  
+# Auto-refresh interval limits (Randomized between 2 to 7 minutes)
+MIN_INTERVAL = 120  # 2 minutes in seconds
+MAX_INTERVAL = 420  # 7 minutes in seconds
 
 class XAUUSDPositionAggregator:
     def __init__(self, config):
@@ -117,7 +118,7 @@ class XAUUSDPositionAggregator:
         
         try:
             if HAS_CFFI:
-                # Custom headers hata diye gaye hain taaki browser fingerprinting fail na ho
+                # Using pure Chrome impersonation without custom headers to avoid mismatch
                 res = cffi_requests.get(url, impersonate="chrome120", timeout=30)
             else:
                 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'}
@@ -203,7 +204,7 @@ if __name__ == "__main__":
     threading.Thread(target=start_dummy_server, daemon=True).start()
     
     aggregator = XAUUSDPositionAggregator(config=CONFIG)
-    print("Starting XAU/USD Sentiment Telegram Dispatcher...")
+    print("Starting XAU/USD Sentiment Telegram Dispatcher with Randomized Delays...")
     
     while True:
         try:
@@ -220,13 +221,20 @@ if __name__ == "__main__":
             bot_token = CONFIG.get("telegram_bot_token")
             chat_id = CONFIG.get("telegram_chat_id")
             
+            # --- Random Timing Logic ---
+            wait_time = random.randint(MIN_INTERVAL, MAX_INTERVAL)
+            wait_minutes = wait_time // 60
+            wait_seconds = wait_time % 60
+            
             if bot_token and chat_id:
                 send_telegram(bot_token, chat_id, telegram_msg)
-                print(f"\n[Auto-refreshing in {FETCH_INTERVAL} seconds... Message sent to Telegram]")
+                print(f"\n[Message sent to Telegram. Next update in a random delay of {wait_minutes} min {wait_seconds} sec...]")
             else:
                 print("Missing Telegram credentials.")
                 
         except Exception as e:
             print(f"Error in loop: {e}")
+            wait_time = random.randint(MIN_INTERVAL, MAX_INTERVAL)
+            print(f"[Error occurred. Retrying in {wait_time // 60} min {wait_time % 60} sec...]")
             
-        time.sleep(FETCH_INTERVAL)
+        time.sleep(wait_time)
