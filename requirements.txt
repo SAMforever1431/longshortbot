@@ -1,9 +1,4 @@
 requests
 pandas
-curl_cffi
-cot_reports
-cloudscraper
-playwright
-pandas
 cot-reports
-requests
+curl_cffi
