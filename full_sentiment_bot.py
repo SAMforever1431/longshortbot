@@ -4,7 +4,7 @@ import datetime
 import requests
 import re
 import pandas as pd
-from playwright.sync_api import sync_playwright
+from curl_cffi import requests as tls_requests
 
 # --- Config ---
 CONFIG = {
@@ -70,93 +70,58 @@ class FullXAUUSDScraper:
         except Exception:
             return {"Source": "CFTC COT (Inst.)", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Status": "Failed"}
 
-    def fetch_browser_sentiments(self):
+    def fetch_web_sentiments(self):
         myfx_data = {"Source": "Myfxbook (Retail)", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Status": "Failed"}
         investing_data = {"Source": "Investing.com", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Status": "Failed"}
 
+        # 1. Myfxbook Scrape via curl_cffi (Cloudflare Bypass)
         try:
-            with sync_playwright() as p:
-                # Anti-detection arguments launch ke sath add kiye gaye hain
-                browser = p.chromium.launch(
-                    headless=True,
-                    args=[
-                        "--disable-blink-features=AutomationControlled",
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-infobars",
-                        "--window-size=1920,1080"
-                    ]
-                )
-                
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                    viewport={"width": 1920, "height": 1080},
-                    device_scale_factor=1,
-                    locale="en-US",
-                    timezone_id="America/New_York"
-                )
-                
-                page = context.new_page()
-                
-                # Navigator automation flags chupane ke liye
-                page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-
-                # 1. Myfxbook Scrape
-                try:
-                    page.goto("https://www.myfxbook.com/community/outlook", timeout=60000, wait_until="domcontentloaded")
-                    time.sleep(5)  # Thoda wait taaki cloudflare challenge clear ho sake
-                    content = page.content()
-                    
-                    long_match = re.search(r'XAUUSD.*?([\d\.]+)%\s*of the forex traders are going long', content, re.DOTALL | re.IGNORECASE)
-                    if not long_match:
-                        long_match = re.search(r'XAUUSD.*?Long.*?(\d+(?:\.\d+)?)%', content, re.DOTALL | re.IGNORECASE)
-                    
-                    if long_match:
-                        long_pct = float(long_match.group(1))
-                        short_pct = round(100 - long_pct, 2)
-                        myfx_data = {
-                            "Source": "Myfxbook (Retail)",
-                            "Long %": round(long_pct, 2),
-                            "Short %": short_pct,
-                            "Net Bias": "LONG" if long_pct > short_pct else "SHORT",
-                            "Status": "OK"
-                        }
-                except Exception as e:
-                    print(f"Myfxbook Error: {e}")
-
-                # 2. Investing.com Scrape
-                try:
-                    page.goto("https://www.investing.com/currencies/xau-usd-sentiments", timeout=60000, wait_until="domcontentloaded")
-                    time.sleep(5)
-                    inv_content = page.content()
-                    
-                    bullish_match = re.search(r'([\d\.]+)%\s*Bullish', inv_content, re.IGNORECASE)
-                    if not bullish_match:
-                        bullish_match = re.search(r'Long.*?([\d\.]+)%', inv_content, re.IGNORECASE)
-                        
-                    if bullish_match:
-                        long_pct = float(bullish_match.group(1))
-                        short_pct = round(100 - long_pct, 2)
-                        investing_data = {
-                            "Source": "Investing.com",
-                            "Long %": round(long_pct, 2),
-                            "Short %": short_pct,
-                            "Net Bias": "LONG" if long_pct > short_pct else "SHORT",
-                            "Status": "OK"
-                        }
-                except Exception as e:
-                    print(f"Investing Error: {e}")
-
-                browser.close()
+            response = tls_requests.get("https://www.myfxbook.com/community/outlook", impersonate="chrome110", timeout=30)
+            content = response.text
+            
+            long_match = re.search(r'XAUUSD.*?([\d\.]+)%\s*of the forex traders are going long', content, re.DOTALL | re.IGNORECASE)
+            if not long_match:
+                long_match = re.search(r'XAUUSD.*?Long.*?(\d+(?:\.\d+)?)%', content, re.DOTALL | re.IGNORECASE)
+            
+            if long_match:
+                long_pct = float(long_match.group(1))
+                short_pct = round(100 - long_pct, 2)
+                myfx_data.update({
+                    "Long %": round(long_pct, 2),
+                    "Short %": short_pct,
+                    "Net Bias": "LONG" if long_pct > short_pct else "SHORT",
+                    "Status": "OK"
+                })
         except Exception as e:
-            print(f"Playwright general error: {e}")
+            print(f"Myfxbook Error: {e}")
+
+        # 2. Investing.com Scrape via curl_cffi (Cloudflare Bypass)
+        try:
+            response = tls_requests.get("https://www.investing.com/currencies/xau-usd-sentiments", impersonate="chrome110", timeout=30)
+            inv_content = response.text
+            
+            bullish_match = re.search(r'([\d\.]+)%\s*Bullish', inv_content, re.IGNORECASE)
+            if not bullish_match:
+                bullish_match = re.search(r'Long.*?([\d\.]+)%', inv_content, re.IGNORECASE)
+                
+            if bullish_match:
+                long_pct = float(bullish_match.group(1))
+                short_pct = round(100 - long_pct, 2)
+                investing_data.update({
+                    "Long %": round(long_pct, 2),
+                    "Short %": short_pct,
+                    "Net Bias": "LONG" if long_pct > short_pct else "SHORT",
+                    "Status": "OK"
+                })
+        except Exception as e:
+            print(f"Investing Error: {e}")
 
         return myfx_data, investing_data
 
     def run_all(self):
         oanda = self.fetch_oanda()
         cot = self.fetch_cftc_cot()
-        myfx, investing = self.fetch_browser_sentiments()
+        myfx, investing = self.fetch_web_sentiments()
         return [oanda, cot, myfx, investing]
 
 def send_telegram(bot_token, chat_id, text):
@@ -172,8 +137,6 @@ if __name__ == "__main__":
     data = aggregator.run_all()
     
     now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    df = pd.DataFrame(data)
-    print(df.to_string(index=False))
     
     msg = f"📊 *COMPREHENSIVE XAU/USD REPORT*\n🕒 `{now}`\n━━━━━━━━━━━━━━━━━━━\n"
     for item in data:
@@ -186,7 +149,7 @@ if __name__ == "__main__":
         
         msg += f"\n🔹 *{source}*\n"
         if status != "OK":
-            msg += f"⚠️ Status: `Failed / Blocked`\n"
+            msg += f"⚠️ Status: `{status}`\n"
         else:
             msg += f"├ Long: `{long_pct}%`  |  Short: `{short_pct}%`\n"
             msg += f"└ Bias: {bias_icon} *{bias}*\n"
