@@ -32,20 +32,35 @@ STATE_FILE = "sentiment_state.json"
 # ============================================================
 
 def load_previous_state():
-    """
-    Load the previous successful sentiment values.
-    """
 
     try:
 
         if not os.path.exists(STATE_FILE):
-            print("ℹ️ No previous state found. First run.")
+
+            print(
+                "ℹ️ No previous state found. "
+                "This is the first run."
+            )
+
             return {}
 
-        with open(STATE_FILE, "r") as f:
+        with open(
+            STATE_FILE,
+            "r"
+        ) as f:
+
             state = json.load(f)
 
-        print("✅ Previous sentiment state loaded")
+        print(
+            "✅ Previous sentiment state loaded"
+        )
+
+        print(
+            json.dumps(
+                state,
+                indent=2
+            )
+        )
 
         return state
 
@@ -60,27 +75,37 @@ def load_previous_state():
 
 
 def save_current_state(data):
-    """
-    Save current successful sentiment values.
-    """
 
     state = {}
 
     for item in data:
 
-        source = item.get("Source")
+        source = item.get(
+            "Source"
+        )
 
-        if item.get("Status") != "OK":
+        if item.get(
+            "Status"
+        ) != "OK":
+
             continue
 
         state[source] = {
-            "Long %": item.get("Long %"),
-            "Short %": item.get("Short %")
+            "Long %": item.get(
+                "Long %"
+            ),
+
+            "Short %": item.get(
+                "Short %"
+            )
         }
 
     try:
 
-        with open(STATE_FILE, "w") as f:
+        with open(
+            STATE_FILE,
+            "w"
+        ) as f:
 
             json.dump(
                 state,
@@ -88,7 +113,9 @@ def save_current_state(data):
                 indent=2
             )
 
-        print("✅ Current sentiment state saved")
+        print(
+            "✅ Current sentiment state saved"
+        )
 
         print(
             json.dumps(
@@ -105,20 +132,24 @@ def save_current_state(data):
         )
 
 
-def percentage_change(current, previous):
-    """
-    Calculate change in percentage points.
-    Example:
-    72.29 -> 72.44 = +0.15
-    """
+def percentage_change(
+    current,
+    previous
+):
 
     if previous is None:
+
         return None
 
     try:
 
-        current = float(current)
-        previous = float(previous)
+        current = float(
+            current
+        )
+
+        previous = float(
+            previous
+        )
 
         return round(
             current - previous,
@@ -130,10 +161,9 @@ def percentage_change(current, previous):
         return None
 
 
-def format_change(change):
-    """
-    Format percentage-point change.
-    """
+def format_change(
+    change
+):
 
     if change is None:
 
@@ -141,22 +171,31 @@ def format_change(change):
 
     if change > 0:
 
-        return f" ▲ +{change:.2f}%"
+        return (
+            f" ▲ +{change:.2f}%"
+        )
 
     if change < 0:
 
-        return f" ▼ {change:.2f}%"
+        return (
+            f" ▼ {change:.2f}%"
+        )
 
-    return " → 0.00%"
+    return (
+        " → 0.00%"
+    )
 
 
 # ============================================================
-# MAIN AGGREGATOR
+# XAU/USD SENTIMENT AGGREGATOR
 # ============================================================
 
 class FullXAUUSDScraper:
 
-    def __init__(self, config):
+    def __init__(
+        self,
+        config
+    ):
 
         self.config = config
 
@@ -168,11 +207,21 @@ class FullXAUUSDScraper:
     def fetch_oanda(self):
 
         result = {
-            "Source": "OANDA (Retail)",
-            "Long %": "NaN",
-            "Short %": "NaN",
-            "Net Bias": "NaN",
-            "Status": "Failed"
+
+            "Source":
+                "OANDA (Retail)",
+
+            "Long %":
+                "NaN",
+
+            "Short %":
+                "NaN",
+
+            "Net Bias":
+                "NaN",
+
+            "Status":
+                "Failed"
         }
 
         print("\n")
@@ -199,7 +248,9 @@ class FullXAUUSDScraper:
                 "❌ OANDA_TOKEN is missing"
             )
 
-            result["Status"] = "Missing Token"
+            result["Status"] = (
+                "Missing Token"
+            )
 
             return result
 
@@ -208,7 +259,8 @@ class FullXAUUSDScraper:
         )
 
         print(
-            f"ℹ️ OANDA environment: {env}"
+            f"ℹ️ OANDA environment: "
+            f"{env}"
         )
 
         # ----------------------------------------------------
@@ -229,12 +281,17 @@ class FullXAUUSDScraper:
 
         url = (
             f"https://{domain}"
-            "/v3/instruments/XAU_USD/positionBook"
+            "/v3/instruments/"
+            "XAU_USD/positionBook"
         )
 
         headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
+
+            "Authorization":
+                f"Bearer {token}",
+
+            "Content-Type":
+                "application/json"
         }
 
         print(
@@ -248,8 +305,11 @@ class FullXAUUSDScraper:
         try:
 
             response = requests.get(
+
                 url,
+
                 headers=headers,
+
                 timeout=30
             )
 
@@ -269,7 +329,8 @@ class FullXAUUSDScraper:
                 )
 
                 result["Status"] = (
-                    f"HTTP {response.status_code}"
+                    f"HTTP "
+                    f"{response.status_code}"
                 )
 
                 return result
@@ -302,8 +363,9 @@ class FullXAUUSDScraper:
             )
 
             print(
-                f"✅ Received {len(buckets)} "
-                "position buckets"
+                f"✅ Received "
+                f"{len(buckets)} "
+                f"position buckets"
             )
 
             if not buckets:
@@ -319,52 +381,61 @@ class FullXAUUSDScraper:
                 return result
 
             # ------------------------------------------------
-            # Calculate sentiment
+            # Calculate percentages
             # ------------------------------------------------
 
             long_pct = sum(
+
                 float(
                     bucket.get(
                         "longCountPercent",
                         0
                     )
                 )
+
                 for bucket in buckets
             )
 
             short_pct = sum(
+
                 float(
                     bucket.get(
                         "shortCountPercent",
                         0
                     )
                 )
+
                 for bucket in buckets
             )
 
             # ------------------------------------------------
-            # Save
+            # Save result
             # ------------------------------------------------
 
             result.update({
 
-                "Long %": round(
-                    long_pct,
-                    2
-                ),
+                "Long %":
+                    round(
+                        long_pct,
+                        2
+                    ),
 
-                "Short %": round(
-                    short_pct,
-                    2
-                ),
+                "Short %":
+                    round(
+                        short_pct,
+                        2
+                    ),
 
-                "Net Bias": (
-                    "LONG"
-                    if long_pct > short_pct
-                    else "SHORT"
-                ),
+                "Net Bias":
+                    (
+                        "LONG"
+                        if long_pct >
+                        short_pct
+                        else "SHORT"
+                    ),
 
-                "Status": "OK"
+                "Status":
+                    "OK"
             })
 
             print(
@@ -388,15 +459,20 @@ class FullXAUUSDScraper:
                 "❌ OANDA request timed out"
             )
 
-            result["Status"] = "Timeout"
+            result["Status"] = (
+                "Timeout"
+            )
 
         except requests.exceptions.RequestException as e:
 
             print(
-                f"❌ OANDA request error: {e}"
+                f"❌ OANDA request error: "
+                f"{e}"
             )
 
-            result["Status"] = "Request Error"
+            result["Status"] = (
+                "Request Error"
+            )
 
         except Exception as e:
 
@@ -405,7 +481,9 @@ class FullXAUUSDScraper:
                 f"{type(e).__name__}: {e}"
             )
 
-            result["Status"] = "Exception"
+            result["Status"] = (
+                "Exception"
+            )
 
         return result
 
@@ -417,11 +495,27 @@ class FullXAUUSDScraper:
     def fetch_cftc_cot(self):
 
         result = {
-            "Source": "CFTC COT (Inst.)",
-            "Long %": "NaN",
-            "Short %": "NaN",
-            "Net Bias": "NaN",
-            "Status": "Failed"
+
+            "Source":
+                "CFTC COT (Inst.)",
+
+            "Long %":
+                "NaN",
+
+            "Short %":
+                "NaN",
+
+            "Long Contracts":
+                0,
+
+            "Short Contracts":
+                0,
+
+            "Net Bias":
+                "NaN",
+
+            "Status":
+                "Failed"
         }
 
         print("\n")
@@ -448,8 +542,11 @@ class FullXAUUSDScraper:
             )
 
             df = cot.cot_year(
+
                 current_year,
-                cot_report_type="disaggregated_fut"
+
+                cot_report_type=
+                    "disaggregated_fut"
             )
 
             print(
@@ -482,14 +579,18 @@ class FullXAUUSDScraper:
             # ------------------------------------------------
 
             gold_cot = df[
+
                 df[
                     market_column
                 ]
                 .astype(str)
                 .str.contains(
+
                     "GOLD - COMMODITY "
                     "EXCHANGE INC.",
+
                     case=False,
+
                     na=False
                 )
             ]
@@ -512,13 +613,13 @@ class FullXAUUSDScraper:
                 return result
 
             # ------------------------------------------------
-            # Latest row
+            # Latest Gold row
             # ------------------------------------------------
 
             latest = gold_cot.iloc[-1]
 
             # ------------------------------------------------
-            # Managed Money
+            # Managed Money columns
             # ------------------------------------------------
 
             long_column = (
@@ -555,6 +656,10 @@ class FullXAUUSDScraper:
 
                 return result
 
+            # ------------------------------------------------
+            # Contract counts
+            # ------------------------------------------------
+
             longs = float(
                 latest[
                     long_column
@@ -568,17 +673,18 @@ class FullXAUUSDScraper:
             )
 
             total = (
-                longs + shorts
+                longs +
+                shorts
             )
 
             print(
                 f"Managed Money Long: "
-                f"{longs}"
+                f"{longs:,.0f}"
             )
 
             print(
                 f"Managed Money Short: "
-                f"{shorts}"
+                f"{shorts:,.0f}"
             )
 
             if total <= 0:
@@ -598,32 +704,49 @@ class FullXAUUSDScraper:
             # ------------------------------------------------
 
             long_pct = (
-                longs / total
+                longs /
+                total
             ) * 100
 
             short_pct = (
-                shorts / total
+                shorts /
+                total
             ) * 100
+
+            # ------------------------------------------------
+            # Save result
+            # ------------------------------------------------
 
             result.update({
 
-                "Long %": round(
-                    long_pct,
-                    2
-                ),
+                "Long %":
+                    round(
+                        long_pct,
+                        2
+                    ),
 
-                "Short %": round(
-                    short_pct,
-                    2
-                ),
+                "Short %":
+                    round(
+                        short_pct,
+                        2
+                    ),
 
-                "Net Bias": (
-                    "LONG"
-                    if longs > shorts
-                    else "SHORT"
-                ),
+                "Long Contracts":
+                    int(longs),
 
-                "Status": "OK"
+                "Short Contracts":
+                    int(shorts),
+
+                "Net Bias":
+                    (
+                        "LONG"
+                        if longs >
+                        shorts
+                        else "SHORT"
+                    ),
+
+                "Status":
+                    "OK"
             })
 
             print(
@@ -634,6 +757,16 @@ class FullXAUUSDScraper:
             print(
                 f"✅ CFTC Short: "
                 f"{short_pct:.2f}%"
+            )
+
+            print(
+                f"✅ CFTC Long Contracts: "
+                f"{longs:,.0f}"
+            )
+
+            print(
+                f"✅ CFTC Short Contracts: "
+                f"{shorts:,.0f}"
             )
 
             print(
@@ -648,7 +781,8 @@ class FullXAUUSDScraper:
             )
 
             print(
-                f"Type: {type(e).__name__}"
+                f"Type: "
+                f"{type(e).__name__}"
             )
 
             print(
@@ -669,13 +803,27 @@ class FullXAUUSDScraper:
     def fetch_myfxbook(self):
 
         result = {
-            "Source": "Myfxbook (Retail)",
-            "Long %": "NaN",
-            "Short %": "NaN",
-            "Long Positions": 0,
-            "Short Positions": 0,
-            "Net Bias": "NaN",
-            "Status": "Failed"
+
+            "Source":
+                "Myfxbook (Retail)",
+
+            "Long %":
+                "NaN",
+
+            "Short %":
+                "NaN",
+
+            "Long Positions":
+                0,
+
+            "Short Positions":
+                0,
+
+            "Net Bias":
+                "NaN",
+
+            "Status":
+                "Failed"
         }
 
         print("\n")
@@ -739,11 +887,18 @@ class FullXAUUSDScraper:
             )
 
             login_response = requests.get(
+
                 login_url,
+
                 params={
-                    "email": email,
-                    "password": password
+
+                    "email":
+                        email,
+
+                    "password":
+                        password
                 },
+
                 timeout=30
             )
 
@@ -758,7 +913,9 @@ class FullXAUUSDScraper:
                 login_response.json()
             )
 
-            if login_data.get("error"):
+            if login_data.get(
+                "error"
+            ):
 
                 print(
                     "❌ Myfxbook login failed:"
@@ -811,10 +968,14 @@ class FullXAUUSDScraper:
             )
 
             outlook_response = requests.get(
+
                 outlook_url,
+
                 params={
-                    "session": session
+                    "session":
+                        session
                 },
+
                 timeout=30
             )
 
@@ -829,7 +990,9 @@ class FullXAUUSDScraper:
                 outlook_response.json()
             )
 
-            if outlook_data.get("error"):
+            if outlook_data.get(
+                "error"
+            ):
 
                 print(
                     "❌ Myfxbook outlook error:"
@@ -878,6 +1041,7 @@ class FullXAUUSDScraper:
                 if name == "XAUUSD":
 
                     xau = symbol
+
                     break
 
             if xau is None:
@@ -911,7 +1075,7 @@ class FullXAUUSDScraper:
             )
 
             # ------------------------------------------------
-            # Position counts
+            # Actual position counts
             # ------------------------------------------------
 
             long_positions = int(
@@ -928,17 +1092,23 @@ class FullXAUUSDScraper:
                 )
             )
 
+            # ------------------------------------------------
+            # Save result
+            # ------------------------------------------------
+
             result.update({
 
-                "Long %": round(
-                    long_pct,
-                    2
-                ),
+                "Long %":
+                    round(
+                        long_pct,
+                        2
+                    ),
 
-                "Short %": round(
-                    short_pct,
-                    2
-                ),
+                "Short %":
+                    round(
+                        short_pct,
+                        2
+                    ),
 
                 "Long Positions":
                     long_positions,
@@ -946,13 +1116,16 @@ class FullXAUUSDScraper:
                 "Short Positions":
                     short_positions,
 
-                "Net Bias": (
-                    "LONG"
-                    if long_pct > short_pct
-                    else "SHORT"
-                ),
+                "Net Bias":
+                    (
+                        "LONG"
+                        if long_pct >
+                        short_pct
+                        else "SHORT"
+                    ),
 
-                "Status": "OK"
+                "Status":
+                    "OK"
             })
 
             print(
@@ -995,7 +1168,7 @@ class FullXAUUSDScraper:
 
 
     # ========================================================
-    # RUN ALL SOURCES
+    # RUN ALL
     # ========================================================
 
     def run_all(self):
@@ -1005,11 +1178,17 @@ class FullXAUUSDScraper:
         print("# XAU/USD SENTIMENT AGGREGATOR")
         print("#" * 60)
 
-        oanda = self.fetch_oanda()
+        oanda = (
+            self.fetch_oanda()
+        )
 
-        cftc = self.fetch_cftc_cot()
+        cftc = (
+            self.fetch_cftc_cot()
+        )
 
-        myfxbook = self.fetch_myfxbook()
+        myfxbook = (
+            self.fetch_myfxbook()
+        )
 
         return [
             oanda,
@@ -1059,16 +1238,25 @@ def send_telegram(
     )
 
     payload = {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "Markdown"
+
+        "chat_id":
+            chat_id,
+
+        "text":
+            text,
+
+        "parse_mode":
+            "Markdown"
     }
 
     try:
 
         response = requests.post(
+
             url,
+
             json=payload,
+
             timeout=20
         )
 
@@ -1115,9 +1303,12 @@ if __name__ == "__main__":
     # Fetch all sources
     # --------------------------------------------------------
 
-    data = aggregator.run_all()
+    data = (
+        aggregator.run_all()
+    )
 
     # --------------------------------------------------------
+    # IMPORTANT:
     # Load previous state BEFORE saving current state
     # --------------------------------------------------------
 
@@ -1125,20 +1316,8 @@ if __name__ == "__main__":
         load_previous_state()
     )
 
-    print("\n")
-    print("=" * 60)
-    print("PREVIOUS STATE")
-    print("=" * 60)
-
-    print(
-        json.dumps(
-            previous_state,
-            indent=2
-        )
-    )
-
     # --------------------------------------------------------
-    # Current timestamp
+    # Timestamp
     # --------------------------------------------------------
 
     now = datetime.datetime.now().strftime(
@@ -1156,7 +1335,7 @@ if __name__ == "__main__":
     )
 
     # --------------------------------------------------------
-    # Build Telegram report
+    # Build report
     # --------------------------------------------------------
 
     for item in data:
@@ -1203,7 +1382,7 @@ if __name__ == "__main__":
             bias_icon = "⚪"
 
         # ----------------------------------------------------
-        # Source
+        # Source heading
         # ----------------------------------------------------
 
         msg += (
@@ -1223,49 +1402,107 @@ if __name__ == "__main__":
             continue
 
         # ----------------------------------------------------
-        # Previous source state
+        # Previous values
         # ----------------------------------------------------
 
-        previous = previous_state.get(
-            source,
-            {}
+        previous = (
+            previous_state.get(
+                source,
+                {}
+            )
         )
 
-        previous_long = previous.get(
-            "Long %"
+        previous_long = (
+            previous.get(
+                "Long %"
+            )
         )
 
-        previous_short = previous.get(
-            "Short %"
-        )
-
-        # ----------------------------------------------------
-        # Calculate changes
-        # ----------------------------------------------------
-
-        long_change = percentage_change(
-            long_pct,
-            previous_long
-        )
-
-        short_change = percentage_change(
-            short_pct,
-            previous_short
-        )
-
-        long_change_text = format_change(
-            long_change
-        )
-
-        short_change_text = format_change(
-            short_change
+        previous_short = (
+            previous.get(
+                "Short %"
+            )
         )
 
         # ----------------------------------------------------
+        # Percentage changes
+        # ----------------------------------------------------
+
+        long_change = (
+            percentage_change(
+                long_pct,
+                previous_long
+            )
+        )
+
+        short_change = (
+            percentage_change(
+                short_pct,
+                previous_short
+            )
+        )
+
+        long_change_text = (
+            format_change(
+                long_change
+            )
+        )
+
+        short_change_text = (
+            format_change(
+                short_change
+            )
+        )
+
+        # ====================================================
+        # OANDA
+        # ====================================================
+
+        if source == "OANDA (Retail)":
+
+            msg += (
+                f"├ Long: `{long_pct}%`"
+                f"{long_change_text}\n"
+            )
+
+            msg += (
+                f"├ Short: `{short_pct}%`"
+                f"{short_change_text}\n"
+            )
+
+        # ====================================================
+        # CFTC
+        # ====================================================
+
+        elif source == "CFTC COT (Inst.)":
+
+            long_contracts = item.get(
+                "Long Contracts",
+                0
+            )
+
+            short_contracts = item.get(
+                "Short Contracts",
+                0
+            )
+
+            msg += (
+                f"├ Long: `{long_pct}%`"
+                f"{long_change_text}"
+                f" | `{long_contracts:,}` contracts\n"
+            )
+
+            msg += (
+                f"├ Short: `{short_pct}%`"
+                f"{short_change_text}"
+                f" | `{short_contracts:,}` contracts\n"
+            )
+
+        # ====================================================
         # MYFXBOOK
-        # ----------------------------------------------------
+        # ====================================================
 
-        if source == "Myfxbook (Retail)":
+        elif source == "Myfxbook (Retail)":
 
             long_positions = item.get(
                 "Long Positions",
@@ -1289,25 +1526,9 @@ if __name__ == "__main__":
                 f" | `{short_positions:,}` positions\n"
             )
 
-        # ----------------------------------------------------
-        # OANDA / CFTC
-        # ----------------------------------------------------
-
-        else:
-
-            msg += (
-                f"├ Long: `{long_pct}%`"
-                f"{long_change_text}\n"
-            )
-
-            msg += (
-                f"├ Short: `{short_pct}%`"
-                f"{short_change_text}\n"
-            )
-
-        # ----------------------------------------------------
-        # Bias
-        # ----------------------------------------------------
+        # ====================================================
+        # BIAS
+        # ====================================================
 
         msg += (
             f"└ Bias: "
@@ -1317,17 +1538,19 @@ if __name__ == "__main__":
     # --------------------------------------------------------
     # SAVE CURRENT STATE
     #
-    # IMPORTANT:
-    # This happens AFTER the Telegram message is built,
-    # so comparison is always:
+    # This happens AFTER the report is created.
+    # Therefore:
     #
-    # previous run → current run
+    # Previous run → Current run
+    #
     # --------------------------------------------------------
 
-    save_current_state(data)
+    save_current_state(
+        data
+    )
 
     # --------------------------------------------------------
-    # Print final Telegram message
+    # Print
     # --------------------------------------------------------
 
     print("\n")
@@ -1335,13 +1558,16 @@ if __name__ == "__main__":
     print("# FINAL TELEGRAM REPORT")
     print("#" * 60)
 
-    print(msg)
+    print(
+        msg
+    )
 
     # --------------------------------------------------------
-    # Send Telegram
+    # Telegram
     # --------------------------------------------------------
 
     send_telegram(
+
         CONFIG.get(
             "telegram_bot_token"
         ),
