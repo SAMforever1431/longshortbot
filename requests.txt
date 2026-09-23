@@ -1,3 +1,4 @@
 requests
 pandas
+curl_cffi
 cot_reports
