@@ -28,17 +28,26 @@ STATE_FILE = "sentiment_state.json"
 
 
 # ============================================================
-# PREVIOUS STATE FUNCTIONS
+# STATE FUNCTIONS
 # ============================================================
 
 def load_previous_state():
+    """
+    Load the previous successful sentiment values.
+    """
 
     try:
 
-        if os.path.exists(STATE_FILE):
+        if not os.path.exists(STATE_FILE):
+            print("ℹ️ No previous state found. First run.")
+            return {}
 
-            with open(STATE_FILE, "r") as f:
-                return json.load(f)
+        with open(STATE_FILE, "r") as f:
+            state = json.load(f)
+
+        print("✅ Previous sentiment state loaded")
+
+        return state
 
     except Exception as e:
 
@@ -47,10 +56,13 @@ def load_previous_state():
             f"{type(e).__name__}: {e}"
         )
 
-    return {}
+        return {}
 
 
 def save_current_state(data):
+    """
+    Save current successful sentiment values.
+    """
 
     state = {}
 
@@ -69,13 +81,21 @@ def save_current_state(data):
     try:
 
         with open(STATE_FILE, "w") as f:
+
             json.dump(
                 state,
                 f,
                 indent=2
             )
 
-        print("✅ Sentiment state saved")
+        print("✅ Current sentiment state saved")
+
+        print(
+            json.dumps(
+                state,
+                indent=2
+            )
+        )
 
     except Exception as e:
 
@@ -86,14 +106,22 @@ def save_current_state(data):
 
 
 def percentage_change(current, previous):
+    """
+    Calculate change in percentage points.
+    Example:
+    72.29 -> 72.44 = +0.15
+    """
 
     if previous is None:
         return None
 
     try:
 
+        current = float(current)
+        previous = float(previous)
+
         return round(
-            float(current) - float(previous),
+            current - previous,
             2
         )
 
@@ -103,8 +131,12 @@ def percentage_change(current, previous):
 
 
 def format_change(change):
+    """
+    Format percentage-point change.
+    """
 
     if change is None:
+
         return ""
 
     if change > 0:
@@ -119,7 +151,7 @@ def format_change(change):
 
 
 # ============================================================
-# SENTIMENT AGGREGATOR
+# MAIN AGGREGATOR
 # ============================================================
 
 class FullXAUUSDScraper:
@@ -158,26 +190,22 @@ class FullXAUUSDScraper:
         )
 
         # ----------------------------------------------------
-        # Check token
+        # Token check
         # ----------------------------------------------------
 
-        if token:
+        if not token:
 
             print(
-                "✅ OANDA_TOKEN received"
+                "❌ OANDA_TOKEN is missing"
             )
 
-        else:
-
-            print(
-                "❌ OANDA_TOKEN is MISSING"
-            )
-
-            result["Status"] = (
-                "Missing Token"
-            )
+            result["Status"] = "Missing Token"
 
             return result
+
+        print(
+            "✅ OANDA_TOKEN received"
+        )
 
         print(
             f"ℹ️ OANDA environment: {env}"
@@ -211,10 +239,6 @@ class FullXAUUSDScraper:
 
         print(
             f"🌐 Endpoint: {url}"
-        )
-
-        print(
-            "📡 Requesting OANDA PositionBook..."
         )
 
         # ----------------------------------------------------
@@ -263,8 +287,7 @@ class FullXAUUSDScraper:
             if not position_book:
 
                 print(
-                    "❌ positionBook missing "
-                    "from response"
+                    "❌ positionBook missing"
                 )
 
                 result["Status"] = (
@@ -296,7 +319,7 @@ class FullXAUUSDScraper:
                 return result
 
             # ------------------------------------------------
-            # Calculate percentages
+            # Calculate sentiment
             # ------------------------------------------------
 
             long_pct = sum(
@@ -318,6 +341,10 @@ class FullXAUUSDScraper:
                 )
                 for bucket in buckets
             )
+
+            # ------------------------------------------------
+            # Save
+            # ------------------------------------------------
 
             result.update({
 
@@ -369,9 +396,7 @@ class FullXAUUSDScraper:
                 f"❌ OANDA request error: {e}"
             )
 
-            result["Status"] = (
-                "Request Error"
-            )
+            result["Status"] = "Request Error"
 
         except Exception as e:
 
@@ -428,15 +453,8 @@ class FullXAUUSDScraper:
             )
 
             print(
-                "✅ CFTC dataframe received"
-            )
-
-            print(
-                f"Rows: {len(df)}"
-            )
-
-            print(
-                f"Columns: {len(df.columns)}"
+                f"✅ CFTC dataframe received: "
+                f"{len(df)} rows"
             )
 
             # ------------------------------------------------
@@ -450,8 +468,7 @@ class FullXAUUSDScraper:
             if market_column not in df.columns:
 
                 print(
-                    "❌ Required CFTC column "
-                    "is missing"
+                    "❌ Market column missing"
                 )
 
                 result["Status"] = (
@@ -488,31 +505,6 @@ class FullXAUUSDScraper:
                     "❌ GOLD contract not found"
                 )
 
-                possible_gold = df[
-                    df[
-                        market_column
-                    ]
-                    .astype(str)
-                    .str.contains(
-                        "GOLD",
-                        case=False,
-                        na=False
-                    )
-                ]
-
-                print(
-                    "Possible GOLD contracts:"
-                )
-
-                for name in possible_gold[
-                    market_column
-                ].drop_duplicates().head(20):
-
-                    print(
-                        " -",
-                        name
-                    )
-
                 result["Status"] = (
                     "Gold Not Found"
                 )
@@ -526,7 +518,7 @@ class FullXAUUSDScraper:
             latest = gold_cot.iloc[-1]
 
             # ------------------------------------------------
-            # Managed Money columns
+            # Managed Money
             # ------------------------------------------------
 
             long_column = (
@@ -563,10 +555,6 @@ class FullXAUUSDScraper:
 
                 return result
 
-            # ------------------------------------------------
-            # Extract Managed Money
-            # ------------------------------------------------
-
             longs = float(
                 latest[
                     long_column
@@ -596,8 +584,7 @@ class FullXAUUSDScraper:
             if total <= 0:
 
                 print(
-                    "❌ Total positions "
-                    "is zero"
+                    "❌ Invalid CFTC positions"
                 )
 
                 result["Status"] = (
@@ -669,7 +656,7 @@ class FullXAUUSDScraper:
             )
 
             result["Status"] = (
-                f"{type(e).__name__}"
+                type(e).__name__
             )
 
         return result
@@ -796,7 +783,7 @@ class FullXAUUSDScraper:
             if not session:
 
                 print(
-                    "❌ No session received"
+                    "❌ No Myfxbook session"
                 )
 
                 result["Status"] = (
@@ -1001,14 +988,14 @@ class FullXAUUSDScraper:
             )
 
             result["Status"] = (
-                f"{type(e).__name__}"
+                type(e).__name__
             )
 
         return result
 
 
     # ========================================================
-    # RUN ALL
+    # RUN ALL SOURCES
     # ========================================================
 
     def run_all(self):
@@ -1116,18 +1103,38 @@ def send_telegram(
 
 if __name__ == "__main__":
 
+    # --------------------------------------------------------
+    # Create aggregator
+    # --------------------------------------------------------
+
     aggregator = FullXAUUSDScraper(
         config=CONFIG
     )
 
+    # --------------------------------------------------------
+    # Fetch all sources
+    # --------------------------------------------------------
+
     data = aggregator.run_all()
 
     # --------------------------------------------------------
-    # Load previous values
+    # Load previous state BEFORE saving current state
     # --------------------------------------------------------
 
     previous_state = (
         load_previous_state()
+    )
+
+    print("\n")
+    print("=" * 60)
+    print("PREVIOUS STATE")
+    print("=" * 60)
+
+    print(
+        json.dumps(
+            previous_state,
+            indent=2
+        )
     )
 
     # --------------------------------------------------------
@@ -1149,7 +1156,7 @@ if __name__ == "__main__":
     )
 
     # --------------------------------------------------------
-    # Build report
+    # Build Telegram report
     # --------------------------------------------------------
 
     for item in data:
@@ -1196,7 +1203,7 @@ if __name__ == "__main__":
             bias_icon = "⚪"
 
         # ----------------------------------------------------
-        # Source title
+        # Source
         # ----------------------------------------------------
 
         msg += (
@@ -1204,7 +1211,7 @@ if __name__ == "__main__":
         )
 
         # ----------------------------------------------------
-        # Error
+        # Failed source
         # ----------------------------------------------------
 
         if status != "OK":
@@ -1216,7 +1223,7 @@ if __name__ == "__main__":
             continue
 
         # ----------------------------------------------------
-        # Previous state
+        # Previous source state
         # ----------------------------------------------------
 
         previous = previous_state.get(
@@ -1255,7 +1262,7 @@ if __name__ == "__main__":
         )
 
         # ----------------------------------------------------
-        # Myfxbook
+        # MYFXBOOK
         # ----------------------------------------------------
 
         if source == "Myfxbook (Retail)":
@@ -1308,24 +1315,30 @@ if __name__ == "__main__":
         )
 
     # --------------------------------------------------------
-    # Save current state
+    # SAVE CURRENT STATE
+    #
+    # IMPORTANT:
+    # This happens AFTER the Telegram message is built,
+    # so comparison is always:
+    #
+    # previous run → current run
     # --------------------------------------------------------
 
     save_current_state(data)
 
     # --------------------------------------------------------
-    # Print final report
+    # Print final Telegram message
     # --------------------------------------------------------
 
     print("\n")
     print("#" * 60)
-    print("# FINAL REPORT")
+    print("# FINAL TELEGRAM REPORT")
     print("#" * 60)
 
     print(msg)
 
     # --------------------------------------------------------
-    # Telegram
+    # Send Telegram
     # --------------------------------------------------------
 
     send_telegram(
