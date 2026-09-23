@@ -8,9 +8,6 @@ import random
 import pandas as pd
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# Nayi library import kar rahe hain Cloudflare bypass ke liye
-import cloudscraper
-
 # --- Render Health Check Dummy Server ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -39,14 +36,6 @@ MAX_INTERVAL = 420
 class XAUUSDPositionAggregator:
     def __init__(self, config):
         self.config = config
-        # Ek naya cloudscraper instance banaya jo Chrome browser hone ka natak karega
-        self.scraper = cloudscraper.create_scraper(
-            browser={
-                'browser': 'chrome',
-                'platform': 'windows',
-                'desktop': True
-            }
-        )
 
     def fetch_oanda(self):
         token = self.config.get("oanda_token")
@@ -117,26 +106,26 @@ class XAUUSDPositionAggregator:
         except Exception:
             return {"Source": "CFTC COT (Inst.)", "Metric": "Managed Money", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Timestamp": "NaN", "Status": "Failed"}
 
-    def fetch_myfxbook(self):
-        url = "https://www.myfxbook.com/community/outlook/XAUUSD"
-        
+    def fetch_dailyfx(self):
+        url = "https://www.dailyfx.com/gold-price"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
         try:
-            # Yahan nayi cloudscraper library ka use kar rahe hain
-            res = self.scraper.get(url, timeout=30)
-
+            res = requests.get(url, headers=headers, timeout=20)
             if res.status_code != 200:
-                return {"Source": "Myfxbook (Retail)", "Metric": "NaN", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Timestamp": "NaN", "Status": f"HTTP {res.status_code}"}
+                return {"Source": "DailyFX (Retail)", "Metric": "NaN", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Timestamp": "NaN", "Status": f"HTTP {res.status_code}"}
 
             html = res.text
+            # DailyFX sentiment pattern matching for gold
+            long_match = re.search(r'long[:\s]*([\d\.]+)%', html, re.IGNORECASE)
+            short_match = re.search(r'short[:\s]*([\d\.]+)%', html, re.IGNORECASE)
 
-            short_match = re.search(r'(\d+(?:\.\d+)?)%\s*of the forex traders are currently going short', html, re.IGNORECASE)
-            long_match = re.search(r'(\d+(?:\.\d+)?)%\s*of the forex traders are going long', html, re.IGNORECASE)
-
-            if short_match and long_match:
-                short_pct = float(short_match.group(1))
+            if long_match and short_match:
                 long_pct = float(long_match.group(1))
+                short_pct = float(short_match.group(1))
                 return {
-                    "Source": "Myfxbook (Retail)",
+                    "Source": "DailyFX (Retail)",
                     "Metric": "XAUUSD",
                     "Long %": round(long_pct, 2),
                     "Short %": round(short_pct, 2),
@@ -144,29 +133,13 @@ class XAUUSDPositionAggregator:
                     "Timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
                     "Status": "NaN"
                 }
-
-            short_tbl = re.search(r'Short</span>\s*</td>\s*<td[^>]*>\s*(\d+(?:\.\d+)?)%', html, re.IGNORECASE)
-            long_tbl = re.search(r'Long</span>\s*</td>\s*<td[^>]*>\s*(\d+(?:\.\d+)?)%', html, re.IGNORECASE)
-            if short_tbl and long_tbl:
-                short_pct = float(short_tbl.group(1))
-                long_pct = float(long_tbl.group(1))
-                return {
-                    "Source": "Myfxbook (Retail)",
-                    "Metric": "XAUUSD",
-                    "Long %": round(long_pct, 2),
-                    "Short %": round(short_pct, 2),
-                    "Net Bias": "LONG" if long_pct > short_pct else "SHORT",
-                    "Timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
-                    "Status": "NaN"
-                }
-
         except Exception as e:
-            print(f"[Myfxbook Exception] Error: {e}")
+            print(f"[DailyFX Exception] Error: {e}")
 
-        return {"Source": "Myfxbook (Retail)", "Metric": "NaN", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Timestamp": "NaN", "Status": "Failed"}
+        return {"Source": "DailyFX (Retail)", "Metric": "NaN", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Timestamp": "NaN", "Status": "Failed"}
 
     def run_all(self):
-        return [self.fetch_oanda(), self.fetch_cftc_cot(), self.fetch_myfxbook()]
+        return [self.fetch_oanda(), self.fetch_cftc_cot(), self.fetch_dailyfx()]
 
 def format_telegram_message(data, timestamp):
     msg = f"📊 *XAU/USD SENTIMENT REPORT*\n🕒 `{timestamp}`\n"
@@ -204,7 +177,7 @@ if __name__ == "__main__":
     threading.Thread(target=start_dummy_server, daemon=True).start()
     
     aggregator = XAUUSDPositionAggregator(config=CONFIG)
-    print("Starting XAU/USD Sentiment Telegram Dispatcher with Randomized Delays & Cloudscraper...")
+    print("Starting XAU/USD Sentiment Telegram Dispatcher with DailyFX & Randomized Delays...")
     
     while True:
         try:
