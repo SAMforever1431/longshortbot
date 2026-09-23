@@ -3,7 +3,6 @@ import time
 import datetime
 import threading
 import requests
-import re
 import random
 import pandas as pd
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -106,40 +105,8 @@ class XAUUSDPositionAggregator:
         except Exception:
             return {"Source": "CFTC COT (Inst.)", "Metric": "Managed Money", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Timestamp": "NaN", "Status": "Failed"}
 
-    def fetch_dailyfx(self):
-        url = "https://www.dailyfx.com/gold-price"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        }
-        try:
-            res = requests.get(url, headers=headers, timeout=20)
-            if res.status_code != 200:
-                return {"Source": "DailyFX (Retail)", "Metric": "NaN", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Timestamp": "NaN", "Status": f"HTTP {res.status_code}"}
-
-            html = res.text
-            # DailyFX sentiment pattern matching for gold
-            long_match = re.search(r'long[:\s]*([\d\.]+)%', html, re.IGNORECASE)
-            short_match = re.search(r'short[:\s]*([\d\.]+)%', html, re.IGNORECASE)
-
-            if long_match and short_match:
-                long_pct = float(long_match.group(1))
-                short_pct = float(short_match.group(1))
-                return {
-                    "Source": "DailyFX (Retail)",
-                    "Metric": "XAUUSD",
-                    "Long %": round(long_pct, 2),
-                    "Short %": round(short_pct, 2),
-                    "Net Bias": "LONG" if long_pct > short_pct else "SHORT",
-                    "Timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
-                    "Status": "NaN"
-                }
-        except Exception as e:
-            print(f"[DailyFX Exception] Error: {e}")
-
-        return {"Source": "DailyFX (Retail)", "Metric": "NaN", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Timestamp": "NaN", "Status": "Failed"}
-
     def run_all(self):
-        return [self.fetch_oanda(), self.fetch_cftc_cot(), self.fetch_dailyfx()]
+        return [self.fetch_oanda(), self.fetch_cftc_cot()]
 
 def format_telegram_message(data, timestamp):
     msg = f"📊 *XAU/USD SENTIMENT REPORT*\n🕒 `{timestamp}`\n"
@@ -177,7 +144,7 @@ if __name__ == "__main__":
     threading.Thread(target=start_dummy_server, daemon=True).start()
     
     aggregator = XAUUSDPositionAggregator(config=CONFIG)
-    print("Starting XAU/USD Sentiment Telegram Dispatcher with DailyFX & Randomized Delays...")
+    print("Starting XAU/USD Sentiment Telegram Dispatcher with OANDA & CFTC COT...")
     
     while True:
         try:
