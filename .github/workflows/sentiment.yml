@@ -27,7 +27,7 @@ jobs:
       # 2. Restore previous sentiment state
       # ======================================================
 
-      - name: Restore sentiment state
+      - name: Restore previous sentiment state
         uses: actions/cache@v4
         with:
           path: sentiment_state.json
