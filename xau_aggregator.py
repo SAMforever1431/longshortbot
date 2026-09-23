@@ -35,8 +35,9 @@ CONFIG = {
     "telegram_chat_id": "1341536286"
 }
 
-# Auto-refresh interval (60 seconds = 1 minute)
-FETCH_INTERVAL = 60  
+# Auto-refresh interval (300 seconds = 5 minutes)
+# Myfxbook rate-limit block se bachne ke liye 1 minute se badha kar 5 minute kiya gaya hai
+FETCH_INTERVAL = 300  
 
 class XAUUSDPositionAggregator:
     def __init__(self, config):
@@ -114,27 +115,13 @@ class XAUUSDPositionAggregator:
     def fetch_myfxbook(self):
         url = "https://www.myfxbook.com/community/outlook/XAUUSD"
         
-        # Real Chrome browser headers to bypass Cloudflare 403 on Data Center IPs
-        browser_headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.google.com/",
-            "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"Windows"',
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "cross-site",
-            "Sec-Fetch-User": "?1",
-            "Upgrade-Insecure-Requests": "1"
-        }
-        
         try:
             if HAS_CFFI:
-                res = cffi_requests.get(url, headers=browser_headers, impersonate="chrome120", timeout=25)
+                # Custom headers hata diye gaye hain taaki browser fingerprinting fail na ho
+                res = cffi_requests.get(url, impersonate="chrome120", timeout=30)
             else:
-                res = requests.get(url, headers=browser_headers, timeout=25)
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'}
+                res = requests.get(url, headers=headers, timeout=30)
 
             if res.status_code != 200:
                 return {"Source": "Myfxbook (Retail)", "Metric": "NaN", "Long %": "NaN", "Short %": "NaN", "Net Bias": "NaN", "Timestamp": "NaN", "Status": f"HTTP {res.status_code}"}
