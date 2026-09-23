@@ -2,10 +2,6 @@ import os
 import requests
 
 
-# ============================================================
-# MYFXBOOK TEST
-# ============================================================
-
 MYFXBOOK_EMAIL = os.getenv("MYFXBOOK_EMAIL")
 MYFXBOOK_PASSWORD = os.getenv("MYFXBOOK_PASSWORD")
 
@@ -62,7 +58,7 @@ def test_myfxbook():
         return
 
     # --------------------------------------------------------
-    # Check Myfxbook response
+    # Check login response
     # --------------------------------------------------------
 
     if login_data.get("error"):
@@ -123,11 +119,7 @@ def test_myfxbook():
     if outlook_data.get("error"):
 
         print("❌ Myfxbook returned an error")
-
-        print(
-            "Message:",
-            outlook_data.get("message")
-        )
+        print("Message:", outlook_data.get("message"))
 
         return
 
@@ -163,10 +155,7 @@ def test_myfxbook():
         print("\nAvailable symbols:")
 
         for symbol in symbols:
-            print(
-                " -",
-                symbol.get("name")
-            )
+            print(" -", symbol.get("name"))
 
         return
 
@@ -204,29 +193,15 @@ def test_myfxbook():
 
     print(f"Long %          : {long_pct}%")
     print(f"Short %         : {short_pct}%")
-
-    print(
-        f"Long Positions  : {long_positions}"
-    )
-
-    print(
-        f"Short Positions : {short_positions}"
-    )
-
-    print(
-        f"Total Positions : {total_positions}"
-    )
+    print(f"Long Positions  : {long_positions}")
+    print(f"Short Positions : {short_positions}")
+    print(f"Total Positions : {total_positions}")
 
     if long_pct > short_pct:
-
         bias = "LONG"
-
     elif short_pct > long_pct:
-
         bias = "SHORT"
-
     else:
-
         bias = "NEUTRAL"
 
     print(f"Bias            : {bias}")
@@ -236,10 +211,5 @@ def test_myfxbook():
     print("\n✅ MYFXBOOK TEST PASSED")
 
 
-# ============================================================
-# RUN
-# ============================================================
-
 if __name__ == "__main__":
-
     test_myfxbook()
