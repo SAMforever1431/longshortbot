@@ -1,4 +1,1 @@
 requests
-pandas
-cot-reports
-curl_cffi
