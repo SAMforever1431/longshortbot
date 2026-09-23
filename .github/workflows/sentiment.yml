@@ -1,0 +1,28 @@
+name: Run XAUUSD Sentiment Scraper
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Har 30 minute mein ek baar chalega (Free)
+  workflow_dispatch: # Manual run button
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Run script
+        run: python full_sentiment_bot.py
