@@ -1,7 +1,22 @@
-import datetime
+import os
 import time
+import datetime
+import threading
 import requests
 import pandas as pd
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+# Dummy Web Server Render Port Scan ko pass karne ke liye
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"XAU/USD Bot is running live!")
+
+def start_dummy_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
 
 CONFIG = {
     "oanda_token": "d38b07755c64c9cc317f0fa5cc7b17a3-a138e9540f606157d02533ab654afd4b",
@@ -14,8 +29,7 @@ CONFIG = {
     "telegram_chat_id": "1341536286"
 }
 
-# Updates every 15 minutes (900 seconds)
-FETCH_INTERVAL = 900 
+FETCH_INTERVAL = 900  # 15 Minutes
 
 class XAUUSDPositionAggregator:
     def __init__(self, config):
@@ -131,9 +145,12 @@ def send_telegram(bot_token, chat_id, text):
         print(f"Telegram error: {e}")
 
 if __name__ == "__main__":
-    aggregator = XAUUSDPositionAggregator(config=CONFIG)
+    # Web server ko background thread me start karein
+    threading.Thread(target=start_dummy_server, daemon=True).start()
     
+    aggregator = XAUUSDPositionAggregator(config=CONFIG)
     print("Starting XAU/USD Sentiment Telegram Dispatcher...")
+    
     while True:
         try:
             data = aggregator.run_all()
