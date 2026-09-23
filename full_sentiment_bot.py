@@ -76,19 +76,39 @@ class FullXAUUSDScraper:
 
         try:
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
-                page = browser.new_page(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+                # Anti-detection arguments launch ke sath add kiye gaye hain
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-infobars",
+                        "--window-size=1920,1080"
+                    ]
+                )
                 
+                context = browser.new_context(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    viewport={"width": 1920, "height": 1080},
+                    device_scale_factor=1,
+                    locale="en-US",
+                    timezone_id="America/New_York"
+                )
+                
+                page = context.new_page()
+                
+                # Navigator automation flags chupane ke liye
+                page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+
                 # 1. Myfxbook Scrape
                 try:
-                    page.goto("https://www.myfxbook.com/community/outlook", timeout=60000)
-                    page.wait_for_selector("text=XAUUSD", timeout=15000)
+                    page.goto("https://www.myfxbook.com/community/outlook", timeout=60000, wait_until="domcontentloaded")
+                    time.sleep(5)  # Thoda wait taaki cloudflare challenge clear ho sake
                     content = page.content()
                     
-                    # Parsing percentages based on layout
                     long_match = re.search(r'XAUUSD.*?([\d\.]+)%\s*of the forex traders are going long', content, re.DOTALL | re.IGNORECASE)
                     if not long_match:
-                        # Alternative table match fallback
                         long_match = re.search(r'XAUUSD.*?Long.*?(\d+(?:\.\d+)?)%', content, re.DOTALL | re.IGNORECASE)
                     
                     if long_match:
@@ -102,16 +122,18 @@ class FullXAUUSDScraper:
                             "Status": "OK"
                         }
                 except Exception as e:
-                    print(f"Myfxbook Playwright Error: {e}")
+                    print(f"Myfxbook Error: {e}")
 
                 # 2. Investing.com Scrape
                 try:
-                    page.goto("https://in.investing.com/currencies/xau-usd-scoreboard", timeout=60000)
-                    page.wait_for_selector("text=Recent Sentiments", timeout=15000)
+                    page.goto("https://www.investing.com/currencies/xau-usd-sentiments", timeout=60000, wait_until="domcontentloaded")
+                    time.sleep(5)
                     inv_content = page.content()
                     
-                    # Extracting sentiment gauge info if available
                     bullish_match = re.search(r'([\d\.]+)%\s*Bullish', inv_content, re.IGNORECASE)
+                    if not bullish_match:
+                        bullish_match = re.search(r'Long.*?([\d\.]+)%', inv_content, re.IGNORECASE)
+                        
                     if bullish_match:
                         long_pct = float(bullish_match.group(1))
                         short_pct = round(100 - long_pct, 2)
@@ -123,7 +145,7 @@ class FullXAUUSDScraper:
                             "Status": "OK"
                         }
                 except Exception as e:
-                    print(f"Investing.com Playwright Error: {e}")
+                    print(f"Investing Error: {e}")
 
                 browser.close()
         except Exception as e:
@@ -153,7 +175,6 @@ if __name__ == "__main__":
     df = pd.DataFrame(data)
     print(df.to_string(index=False))
     
-    # Format Telegram Message
     msg = f"📊 *COMPREHENSIVE XAU/USD REPORT*\n🕒 `{now}`\n━━━━━━━━━━━━━━━━━━━\n"
     for item in data:
         source = item.get("Source", "N/A")
